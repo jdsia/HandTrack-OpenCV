@@ -116,6 +116,7 @@ while True:
                 (0, 0, 255),
                 2
             )
+
     if history:
         stable_n = Counter(history).most_common(1)[0][0]
         cv2.putText(frame, f'Fingers up: {stable_n}', (50, 50),
