@@ -82,6 +82,19 @@ def detect_pinch(hand_landmarks):
 
     return distance < 0.05
 
+
+def detect_spread(hand_landmarks):
+    thumb = hand_landmarks[4]
+    index = hand_landmarks[8]
+
+    distance = math.sqrt(
+        (thumb.x - index.x)**2 +
+        (thumb.y - index.y)**2
+    )
+
+    return distance > 0.2
+
+
 history = deque(maxlen=10)
 
 while True:
@@ -110,6 +123,19 @@ while True:
             cv2.putText(
                 frame,
                 "PINCHED FINGERS",
+                (50, 100),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,
+                (0, 0, 255),
+                2
+            )
+
+        # only show spread if more than 2 fingers are raised
+        stable_n = Counter(history).most_common(1)[0][0]
+        if detect_spread(hand) and stable_n == 2:
+            cv2.putText(
+                frame,
+                "SPREAD FINGERS",
                 (50, 100),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 1,
