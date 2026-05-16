@@ -32,7 +32,7 @@ source .venv/bin/activate
 
 ```bash
 python -m pip install --upgrade pip
-pip install mediapipe opencv-python pygame
+pip install mediapipe opencv-python pygame pyautogui
 ```
 
 ## Running the Project
@@ -50,13 +50,40 @@ The script will:
 - Connect joints with lines to show the hand skeleton
 - Fingertips are highlighted with larger green circles
 
+
+
 Press `q` to exit the application.
 
-## Project Structure
+## Adding Mouse Control
+
+This project also includes a script to control the mouse pointer using hand gestures. The mouse script uses the same hand tracking setup to map hand movements to screen coordinates.
+
+### Running the Mouse Script
+
+With the virtual environment activated:
+
+```bash
+python mouse_script.py
+```
+
+The script will:
+- Track your hand in real-time
+- Map hand movements to control the mouse pointer
+- Detect specific gestures (pinching or spreading fingers) for mouse clicks or other actions
+
+### Additional Dependencies
+Ensure you have the following installed:
+
+```bash
+pip install pyautogui
+```
+
+### Project Structure (Updated)
 
 ```
 .
 ├── script.py                 # Main hand tracking script
+├── mouse_script.py           # Mouse control script
 ├── hand_landmarker.task      # MediaPipe hand detection model
 └── README.md                 # This file
 ```
