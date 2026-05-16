@@ -2,7 +2,7 @@ import cv2
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
-from collections import deque, Counter
+from collections import Counter, deque
 import math
 from pynput.mouse import Controller, Button
 import time
@@ -17,15 +17,6 @@ cooldown = 0.5 #secs
 # for smoothing
 prev_x, prev_y = 0, 0
 alpha = 0.2
-
-# scrolling vars
-scrolling = False
-prev_scroll_y = 0
-scroll_velocity = 0.0
-scroll_alpha = 0.3       # EMA smoothing factor (lower = smoother)
-scroll_scale = 60        # tune to adjust scroll speed
-scrollhistory = deque(maxlen=10)
-
 
 base_options = python.BaseOptions(model_asset_path='hand_landmarker.task')
 options = vision.HandLandmarkerOptions(
@@ -163,16 +154,12 @@ def detect_pinch(hand_landmarks):
     return distance < 0.05
 
 
+# Added detect_spread function to detect hand spread
 def detect_spread(hand_landmarks):
-    thumb = hand_landmarks[4]
-    index = hand_landmarks[8]
-
-    distance = math.sqrt(
-        (thumb.x - index.x)**2 +
-        (thumb.y - index.y)**2
-    )
-
-    return distance > 0.2
+    thumb_tip = hand_landmarks[4]
+    index_tip = hand_landmarks[8]
+    distance = math.sqrt((thumb_tip.x - index_tip.x)**2 + (thumb_tip.y - index_tip.y)**2)
+    return distance > 0.2  # Threshold for spread detection
 
 
 # FIX 1: function was defined as three_fingers_up but called as is_three_fingers_up
@@ -185,20 +172,7 @@ def three_fingers_up(hand_landmarks):
     ) == 3
 
 def handle_scroll(hand_landmarks):
-    global prev_scroll_y, scroll_velocity, last_scroll_time, scroll_alpha, scroll_scale
-
-    index = hand_landmarks[8]
-    current_y = index.y
-    dy = current_y - prev_scroll_y
-    prev_scroll_y = current_y
-
-    scroll_velocity = scroll_alpha * dy + (1 - scroll_alpha) * scroll_velocity
-
-    scroll_amount = scroll_velocity * -scroll_scale
-
-    if abs(scroll_amount) > 0.5:
-        mouse.scroll(0, scroll_amount)
-
+    pass  # Removed scrolling logic
 
 
 history = deque(maxlen=10)
@@ -214,25 +188,9 @@ while True:
     if results.hand_landmarks:
         hand = results.hand_landmarks[0]
 
-        three_fingers = three_fingers_up(hand)  
-
-        scrollhistory.append(three_fingers)      
-        stable_scroll = sum(scrollhistory) > 5   
+        three_fingers = three_fingers_up(hand)  # FIX 1: corrected function name
 
         move_cursor(hand)
-
-        # ENTER scroll mode
-        if stable_scroll and not scrolling:
-            scrolling = True
-            prev_scroll_y = hand[8].y
-
-        # ACTIVE scroll mode
-        elif stable_scroll and scrolling:
-            handle_scroll(hand)
-
-        # EXIT scroll mode
-        elif not stable_scroll and scrolling:
-            scrolling = False
 
         n = count_fingers(hand)
         history.append(n)
