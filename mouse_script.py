@@ -18,6 +18,14 @@ cooldown = 0.5 #secs
 prev_x, prev_y = 0, 0
 alpha = 0.2
 
+# scrolling vars
+scrolling = False
+prev_scroll_y = 0
+scroll_velocity = 0.0
+scroll_alpha = 0.3       # EMA smoothing factor (lower = smoother)
+scroll_scale = 60        # tune to adjust scroll speed
+scrollhistory = deque(maxlen=10)
+
 
 base_options = python.BaseOptions(model_asset_path='hand_landmarker.task')
 options = vision.HandLandmarkerOptions(
@@ -41,6 +49,8 @@ HAND_CONNECTIONS = [
     (5, 9), (9, 13), (13, 17)              # palm knuckle line
 ]
 
+
+# helper function for mapping for scroll
 def map_range(val, in_min, in_max):
     return (val - in_min) / (in_max - in_min)
 
@@ -121,7 +131,6 @@ def draw_hand_skeleton(frame, hand_landmarks):
             cv2.circle(frame, (x, y), 6, (0, 180, 255), -1)
 
 
-
 def count_fingers(hand_landmarks):
     tips = [8, 12, 16, 20]
     pip  = [6, 10, 14, 18]
@@ -166,60 +175,84 @@ def detect_spread(hand_landmarks):
     return distance > 0.2
 
 
+# FIX 1: function was defined as three_fingers_up but called as is_three_fingers_up
+def three_fingers_up(hand_landmarks):
+    tips = [8, 12, 16]
+    pip = [6, 10, 14]
+    return sum(
+        hand_landmarks[t].y < hand_landmarks[p].y
+        for t, p in zip(tips, pip)
+    ) == 3
+
+def handle_scroll(hand_landmarks):
+    global prev_scroll_y, scroll_velocity, last_scroll_time, scroll_alpha, scroll_scale
+
+    index = hand_landmarks[8]
+    current_y = index.y
+    dy = current_y - prev_scroll_y
+    prev_scroll_y = current_y
+
+    scroll_velocity = scroll_alpha * dy + (1 - scroll_alpha) * scroll_velocity
+
+    scroll_amount = scroll_velocity * -scroll_scale
+
+    if abs(scroll_amount) > 0.5:
+        mouse.scroll(0, scroll_amount)
+
+
+
 history = deque(maxlen=10)
 
 while True:
     ret, frame = cap.read()
     frame = cv2.flip(frame, 1)
 
-
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
     results = detector.detect(mp_image)
 
-    #if results.hand_landmarks:
-    #    n = count_fingers(results.hand_landmarks[0])
-    #    history.append(n)
-    #    draw_hand_skeleton(frame, results.hand_landmarks[0])  # draw skeleton
-
     if results.hand_landmarks:
         hand = results.hand_landmarks[0]
 
+        three_fingers = three_fingers_up(hand)  
+
+        scrollhistory.append(three_fingers)      
+        stable_scroll = sum(scrollhistory) > 5   
+
         move_cursor(hand)
+
+        # ENTER scroll mode
+        if stable_scroll and not scrolling:
+            scrolling = True
+            prev_scroll_y = hand[8].y
+
+        # ACTIVE scroll mode
+        elif stable_scroll and scrolling:
+            handle_scroll(hand)
+
+        # EXIT scroll mode
+        elif not stable_scroll and scrolling:
+            scrolling = False
 
         n = count_fingers(hand)
         history.append(n)
 
         draw_hand_skeleton(frame, hand)
 
-        # # Detect pinch
-        # if detect_pinch(hand):
-        #     cv2.putText(
-        #         frame,
-        #         "PINCHED FINGERS",
-        #         (50, 100),
-        #         cv2.FONT_HERSHEY_SIMPLEX,
-        #         1,
-        #         (0, 0, 255),
-        #         2
-        #     )
-        #     safe_click(Button.left)
-
         pinching = detect_pinch(hand)
-        if (pinching): 
+        if pinching:
             cv2.putText(
-                 frame,
-                 "PINCHED FINGERS",
-                 (50, 100),
-                 cv2.FONT_HERSHEY_SIMPLEX,
-                 1,
-                 (0, 0, 255),
-                 2
-             ) 
+                frame,
+                "PINCHED FINGERS",
+                (50, 100),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,
+                (0, 0, 255),
+                2
+            )
 
         handle_left_click_hold(pinching)
 
-        # only show spread if more than 2 fingers are raised
         stable_n = Counter(history).most_common(1)[0][0]
         if detect_spread(hand) and stable_n == 2:
             cv2.putText(

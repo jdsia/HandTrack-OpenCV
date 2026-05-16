@@ -2,6 +2,12 @@
 
 Real-time hand pose detection and visualization using OpenCV and MediaPipe. This project captures video from your webcam, detects hand landmarks, and displays the hand skeleton overlay.
 
+**mouse_script.py**
+- uses index finger tracking and gesture recognition to control your mouse cursor using pynput
+- pinch - left click
+- finger spread - right click
+- 3 finger w/ swipe for scrolling
+
 ## Prerequisites
 
 - Python 3.8+
@@ -32,7 +38,7 @@ source .venv/bin/activate
 
 ```bash
 python -m pip install --upgrade pip
-pip install mediapipe opencv-python pygame pyautogui
+pip install mediapipe opencv-python pygame pynput
 ```
 
 ## Running the Project
@@ -75,7 +81,7 @@ The script will:
 Ensure you have the following installed:
 
 ```bash
-pip install pyautogui
+pip install pynput
 ```
 
 ### Project Structure (Updated)
