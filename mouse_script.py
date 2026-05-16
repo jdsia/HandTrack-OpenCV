@@ -9,13 +9,15 @@ import time
 
 mouse = Controller()
 screen_w, screen_h = 1920, 1200
+# state for mouse
+left_button_down = False
 last_click_time = 0
 cooldown = 0.5 #secs
-left_button_down = False
 
 # for smoothing
 prev_x, prev_y = 0, 0
 alpha = 0.2
+
 
 base_options = python.BaseOptions(model_asset_path='hand_landmarker.task')
 options = vision.HandLandmarkerOptions(
@@ -39,18 +41,43 @@ HAND_CONNECTIONS = [
     (5, 9), (9, 13), (13, 17)              # palm knuckle line
 ]
 
+def map_range(val, in_min, in_max):
+    return (val - in_min) / (in_max - in_min)
+
+
 def move_cursor(hand_landmarks):
     global prev_x, prev_y
+
     index = hand_landmarks[8]
 
-    target_x = index.x * screen_w
-    target_y = index.y * screen_h
+    # 1. RAW normalized coords from MediaPipe (0–1)
+    x = index.x
+    y = index.y
 
+    # 2. Define usable control region (prevents edge distortion)
+    x_min, x_max = 0.2, 0.8
+    y_min, y_max = 0.2, 0.8
+
+    # 3. Clamp into control region
+    x = max(x_min, min(x_max, x))
+    y = max(y_min, min(y_max, y))
+
+    # 4. Normalize within region → 0–1
+    norm_x = (x - x_min) / (x_max - x_min)
+    norm_y = (y - y_min) / (y_max - y_min)
+
+    # 5. Map to screen space
+    target_x = norm_x * screen_w
+    target_y = norm_y * screen_h
+
+    # 6. Smooth (EMA filter)
     smooth_x = prev_x + (target_x - prev_x) * alpha
     smooth_y = prev_y + (target_y - prev_y) * alpha
 
+    # 7. Apply to mouse
     mouse.position = (int(smooth_x), int(smooth_y))
 
+    # 8. Update state
     prev_x, prev_y = smooth_x, smooth_y
 
 def handle_left_click_hold(is_pinching):
@@ -124,7 +151,6 @@ def detect_pinch(hand_landmarks):
         (thumb.x - index.x)**2 +
         (thumb.y - index.y)**2
     )
-
     return distance < 0.05
 
 
@@ -180,6 +206,17 @@ while True:
         #     safe_click(Button.left)
 
         pinching = detect_pinch(hand)
+        if (pinching): 
+            cv2.putText(
+                 frame,
+                 "PINCHED FINGERS",
+                 (50, 100),
+                 cv2.FONT_HERSHEY_SIMPLEX,
+                 1,
+                 (0, 0, 255),
+                 2
+             ) 
+
         handle_left_click_hold(pinching)
 
         # only show spread if more than 2 fingers are raised
