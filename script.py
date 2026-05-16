@@ -3,6 +3,7 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from collections import deque, Counter
+import math
 
 base_options = python.BaseOptions(model_asset_path='hand_landmarker.task')
 options = vision.HandLandmarkerOptions(
@@ -47,6 +48,8 @@ def draw_hand_skeleton(frame, hand_landmarks):
         else:
             cv2.circle(frame, (x, y), 6, (0, 180, 255), -1)
 
+
+
 def count_fingers(hand_landmarks):
     tips = [8, 12, 16, 20]
     pip  = [6, 10, 14, 18]
@@ -68,6 +71,17 @@ def count_fingers(hand_landmarks):
 
     return count
 
+def detect_pinch(hand_landmarks):
+    thumb = hand_landmarks[4]
+    index = hand_landmarks[8]
+
+    distance = math.sqrt(
+        (thumb.x - index.x)**2 +
+        (thumb.y - index.y)**2
+    )
+
+    return distance < 0.05
+
 history = deque(maxlen=10)
 
 while True:
@@ -78,11 +92,30 @@ while True:
     mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
     results = detector.detect(mp_image)
 
-    if results.hand_landmarks:
-        n = count_fingers(results.hand_landmarks[0])
-        history.append(n)
-        draw_hand_skeleton(frame, results.hand_landmarks[0])  # draw skeleton
+    #if results.hand_landmarks:
+    #    n = count_fingers(results.hand_landmarks[0])
+    #    history.append(n)
+    #    draw_hand_skeleton(frame, results.hand_landmarks[0])  # draw skeleton
 
+    if results.hand_landmarks:
+        hand = results.hand_landmarks[0]
+
+        n = count_fingers(hand)
+        history.append(n)
+
+        draw_hand_skeleton(frame, hand)
+
+        # Detect pinch
+        if detect_pinch(hand):
+            cv2.putText(
+                frame,
+                "PINCHED FINGERS",
+                (50, 100),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,
+                (0, 0, 255),
+                2
+            )
     if history:
         stable_n = Counter(history).most_common(1)[0][0]
         cv2.putText(frame, f'Fingers up: {stable_n}', (50, 50),
